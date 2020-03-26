@@ -1,0 +1,316 @@
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/8.11.8/sweetalert2.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/8.11.8/sweetalert2.all.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.6/cropper.min.css">
+    <title>submarin</title>
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+        
+        main {
+            flex: 1 0 auto;
+        }
+        img {
+            display: block;
+            
+            /* This rule is very important, please don't ignore this */
+            max-width: 100%;
+        }
+        #uploadPreviewParent > img {
+            width:100%;
+        }
+        .moda {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            
+            pointer-events: none;
+            opacity: 0;
+            
+            will-change: transform, opacity;
+        }.moda.visible {
+            pointer-events: auto;
+            opacity: 1;
+        }.moda {
+            -webkit-transform: scale(1.15);
+            transform: scale(1.15);
+            
+            -webkit-transition:
+            -webkit-transform 0.1s cubic-bezier(0.465, 0.183, 0.153, 0.946),
+            opacity 0.1s cubic-bezier(0.465, 0.183, 0.153, 0.946);
+            
+            transition:
+            transform 0.1s cubic-bezier(0.465, 0.183, 0.153, 0.946),
+            opacity 0.1s cubic-bezier(0.465, 0.183, 0.153, 0.946);
+            
+        }.moda.visible {
+            
+            -webkit-transform: scale(1);
+            transform: scale(1);
+            
+            -webkit-transition:
+            -webkit-transform 0.3s cubic-bezier(0.465, 0.183, 0.153, 0.946),
+            opacity 0.3s cubic-bezier(0.465, 0.183, 0.153, 0.946);
+            
+            transition:
+            transform 0.3s cubic-bezier(0.465, 0.183, 0.153, 0.946),
+            opacity 0.3s cubic-bezier(0.465, 0.183, 0.153, 0.946);
+            
+        }
+    </style>
+</head>
+<body>
+    <div class="file-field input-field" style="position: fixed; top: 0; text-align: center;width: 100%; margin: 0 auto;">
+        <div class="btn waves-effect waves-light" style="background-color: #4c8bf5; position: absolute; width: 100%;top: 0;left: 0; right:0; margin: 0 auto;">
+            <span>ファイルを選択</span>
+            <input type="file" id="triming_image" name="triming_image" class="triming-image" accept="image/*">
+        </div>
+    </div>
+    <div class="progress" style="position: fixed; margin-top: 0px; background: transparent;z-index: 99999;" id="loader">
+        <div style="background: #fff;" class="indeterminate"></div>
+    </div>
+    <p style="position: absolute; top: 50%; left: 50%;transform: translate(-50%, -50%); padding: 15px 30px; background: rgba(0,0,0,0.0); text-align: center;backface-visibility: hidden;
+    transform-style: preserve-3d;width: 300px; color: #606060; z-index: -1;">
+    画像を選択するとここにトリミング用の枠が表示されます。
+</p>
+<img src="" alt="画像" id="trimed_image" style="display: none;"/>
+<button id="crop_btn" class="btn  waves-effect waves-light" style="position: absolute; width: 100%;bottom: 0px; background-color: #4c8bF5; color: #fff;">画像を使用する</button>
+</body>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js" charset="UTF-8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.6/cropper.min.js"></script>
+<script>
+    var copy = document.getElementById("copy");
+    var loader = document.getElementById("loader");
+    loader.style.display = "none";
+    
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        onOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+        }
+    });
+    const Fileselect = Swal.mixin({
+        title: '画像をトリミングしますか？',
+        //text: "You won't be able to revert this!",
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'トリミングして使用',
+        cancelButtonText: 'トリミングせずに使用',
+        reverseButtons: true
+    });
+    $('#triming_image').on('change', function(event){
+        
+        Fileselect.fire().then((result) => {
+            if (result.value) {
+                trim(event);
+            } else{
+                notrim(event);
+            }
+        });
+    });
+    const notrim =(event) =>{
+        loader.style.display="block";
+        const image = event.target.files[0];
+        console.log(image);
+        upload(image);
+    }
+    const upload = (imageFILE) =>{
+        var formData = new FormData();
+        console.log(formData);
+        formData.append('upfile',imageFILE);
+        formData.append('p', "subway_3");
+        console.log(formData);
+        $.ajax({
+            url: 'uploadNM.php',
+            type: 'post',
+            processData: false,
+            contentType: false,
+            data: formData,
+        }).done(function(resp){
+            execCopy(resp);
+            loader.style.display = "none";
+            Toast.fire(
+            'URLがコピーされました。',
+            '',
+            'success'
+            )
+        }).fail(function(resp) {
+            loader.style.display = "none";
+            Toast.fire(
+            'エラーが発生しました。',
+            '',
+            'error'
+            )
+        });
+    }
+    const trim = (event) => {
+        loader.style.display="block";
+        var trimingImage = event.target.files;
+        trimingImage = trimingImage[0];
+        if(!trimingImage.type.match('image/jp.*')
+        &&!trimingImage.type.match('image/png*')
+        &&!trimingImage.type.match('image/gif')
+        &&!trimingImage.type.match('image/bmp')
+        ){
+            alert('ファイル形式 ' + trimingImage.type + ' は使用できません。');
+            $(this).val('');
+            return false;
+        }
+        
+        var fileReader = new FileReader();
+        fileReader.onload = function(e){
+            $('#trimed_image').css('display', 'block');
+            $('#trimed_image').attr('src', URL.createObjectURL(trimingImage));
+            return true;
+        };
+        fileReader.readAsArrayBuffer(trimingImage);
+        fileReader.onloadend = function(e){
+            var image = document.getElementById('trimed_image');
+            var button = document.getElementById('crop_btn');
+            var croppable = false;
+            var cropper = new Cropper(image, {
+                // aspectRatio: 1,
+                // viewMode: 1,
+                ready: function () {
+                    loader.style.display="none";
+                    croppable = true;
+                },
+            });
+            
+            button.onclick = function () {
+                loader.style.display="block";
+                
+                var croppedCanvas;
+                if (!croppable) {
+                    
+                    Toast.fire(
+                    'warning',
+                    '',
+                    '画像が選択されていません。'
+                    )
+                    loader.style.display = "none";
+                    return false;
+                }
+                croppedCanvas = cropper.getCroppedCanvas();
+                var blob;
+                if(croppedCanvas.toBlob){
+                    console.log("Blob");
+                    croppedCanvas.toBlob(function(blob){
+                        var formData = new FormData();
+                        console.log(formData);
+                        console.log(blob);
+                        formData.append('upfile',blob);
+                        formData.append('p', "subway_3");
+                        console.log(formData);
+                        $.ajax({
+                            url: 'upload.php',
+                            type: 'post',
+                            processData: false,
+                            contentType: false,
+                            data: formData,
+                        }).done(function(resp){
+                            execCopy(resp);
+                            loader.style.display = "none";
+                            Toast.fire(
+                            'URLがコピーされました。',
+                            '',
+                            'success'
+                            )
+                        }).fail(function(resp) {
+                            loader.style.display = "none";
+                            Toast.fire(
+                            'エラーが発生しました。',
+                            '',
+                            'error'
+                            )
+                        });
+                    });
+                }else if(croppedCanvas.msToBlob){
+                    console.log("mstoblob");
+                    blob = croppedCanvas.msToBlob();
+                    var Formdata = new FormData();
+                    Formdata.append('upfile', blob);
+                    Formdata.append('p', "subway_3");
+                    $.ajax({
+                        url: 'upload.php',
+                        type: 'post',
+                        processData: false,
+                        contentType: false,
+                        data: Formdata,
+                    }).done(function( resp ){
+                        execCopy(resp);
+                        loader.style.display = "none";
+                        Toast.fire(
+                        'URLがコピーされました。',
+                        '',
+                        'success'
+                        )
+                    }).fail(function( resp ) {
+                        loader.style.display = "none";
+                        Toast.fire(
+                        'エラーが発生しました。',
+                        '',
+                        'error'
+                        )
+                    });
+                }else{
+                    loader.style.display = "none";
+                    Toast.fire(
+                    'エラーが発生しました。',
+                    '',
+                    'error'
+                    )
+                }
+            };
+        };
+    };
+    function execCopy(string){
+        
+        // 空div 生成
+        var tmp = document.createElement("div");
+        // 選択用のタグ生成
+        var pre = document.createElement('pre');
+        
+        // 親要素のCSSで user-select: none だとコピーできないので書き換える
+        pre.style.webkitUserSelect = 'auto';
+        pre.style.userSelect = 'auto';
+        
+        tmp.appendChild(pre).textContent = string;
+        
+        // 要素を画面外へ
+        var s = tmp.style;
+        s.position = 'fixed';
+        s.right = '200%';
+        
+        // body に追加
+        document.body.appendChild(tmp);
+        // 要素を選択
+        document.getSelection().selectAllChildren(tmp);
+        
+        // クリップボードにコピー
+        var result = document.execCommand("copy");
+        
+        // 要素削除
+        document.body.removeChild(tmp);
+        
+        return result;
+    }
+    
+</script>
+</html>
+
